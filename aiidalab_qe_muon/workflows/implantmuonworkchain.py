@@ -1,0 +1,172 @@
+"""Implementation of the VibroWorkchain for managing the aiida-vibroscopy workchains."""
+from aiida.common import AttributeDict
+from aiida.engine import ToContext, WorkChain, calcfunction
+from aiida.orm import AbstractCode, Int, Float, Dict, Code, StructureData, load_code
+from aiida.plugins import WorkflowFactory
+from aiida_quantumespresso.utils.mapping import prepare_process_inputs
+from aiida_quantumespresso.common.types import ElectronicType, SpinType
+from aiida.engine import WorkChain, calcfunction, if_
+
+
+MusconvWorkChain = WorkflowFactory('musconv')
+FindMuonWorkChain = WorkflowFactory('muon.find_muon')
+
+class ImplantMuonWorkChain(WorkChain):
+    "WorkChain to compute muon stopping sites in a crystal."
+    label = "muon"
+
+    @classmethod
+    def define(cls, spec):
+        """Specify inputs and outputs."""
+        super().define(spec)
+        
+        spec.input('structure', valid_type=StructureData) #Maybe not needed as input... just in the protocols. but in this way it is not easy to automate it in the app, after the relaxation. So let's keep it for now. 
+
+
+        spec.expose_inputs(
+            MusconvWorkChain,
+            namespace='musconv',
+            exclude=('clean_workdir'), #AAA check this... maybe not needed.
+            namespace_options={
+                'required': False,
+                'populate_defaults': False,
+                'help': 'Inputs for the `MusconvWorkChain`.',
+            }
+        )
+        spec.expose_inputs(
+            FindMuonWorkChain, 
+            namespace='findmuon',
+            exclude=('clean_workdir'), #AAA check this... maybe not needed.
+            namespace_options={
+                'required': False,
+                'populate_defaults': False,
+                'help': (
+                    'Inputs for the `FindMuonWorkChain` that will be'
+                    'used to calculate the muon stopping sites.'
+                )
+            },
+            #exclude=('symmetry')
+        )
+        
+        ###
+        spec.outline(
+            cls.setup,
+            cls.implant_muon,
+            cls.results,
+        )
+        ###
+        spec.expose_outputs(
+            FindMuonWorkChain, namespace='findmuon',
+            namespace_options={'required': False, 'help':'Outputs of the `PhononWorkChain`.'},
+        )
+        spec.expose_outputs(
+            MusconvWorkChain, namespace='musconv',
+            namespace_options={'required': False, 'help':'Outputs of the `DielectricWorkChain`.'},
+        )
+        ###
+        spec.exit_code(400, 'ERROR_WORKCHAIN_FAILED', message='The workchain failed.')
+    
+    @classmethod
+    def get_builder_from_protocol(
+        cls,
+        pw_code,
+        structure,
+        pp_code=None,
+        protocol=None,
+        overrides: dict = {},
+        trigger = None,
+        relax_musconv: bool =False, #in the end you relax in the first step of the QeAppWorkchain.
+        magmom: list = None,
+        options=None,
+        sc_matrix: list =None,
+        mu_spacing: float = 1.0,
+        kpoints_distance: float =0.301,
+        charge_supercell: bool =True,
+        **kwargs
+    ):
+        """Return a builder prepopulated with inputs selected according to the chosen protocol.
+
+        :param pw_code: the ``Code`` instance configured for the ``quantumespresso.pw`` plugin.
+        :param structure: the ``StructureData`` instance to use.
+        :param protocol: protocol to use, if not specified, the default will be used.
+        :param overrides: optional dictionary of inputs to override the defaults of the protocol.
+        :param options: A dictionary of options that will be recursively set for the ``metadata.options`` input of all
+            the ``CalcJobs`` that are nested in this work chain.
+        :param kwargs: additional keyword arguments that will be passed to the ``get_builder_from_protocol`` of all the
+            sub processes that are called by this workchain.
+        :return: a process builder instance with all inputs defined ready for launch.
+        """
+        from aiida_quantumespresso.workflows.protocols.utils import recursive_merge
+        
+        if trigger not in ["findmuon","musconv"]:
+            raise ValueError('trigger not in "findmuon" or "musconv"') 
+        
+        if magmom and not pp_code:
+            raise ValueError("pp code not provided but required, as the system is magnetic.")
+        
+        builder = cls.get_builder()
+        
+        if trigger == "findmuon":
+            builder_findmuon = FindMuonWorkChain.get_builder_from_protocol(
+                pw_code=pw_code,
+                pp_code=pp_code,
+                structure=structure,
+                protocol=protocol,
+                overrides=overrides,
+                relax_musconv=relax_musconv,
+                magmom=magmom,
+                sc_matrix=sc_matrix,
+                mu_spacing=mu_spacing,
+                kpoints_distance=kpoints_distance,
+                charge_supercell=charge_supercell,
+                **kwargs
+            )
+            builder.findmuon = builder_findmuon
+            builder.pop("musconv")
+        
+        elif trigger == "musconv":
+            builder_musconv = MusconvWorkChain.get_builder_from_protocol(
+                code=pw_code,
+                structure=structure,
+                protocol=protocol,
+                overrides=overrides,
+                **kwargs
+            )
+            builder.musconv = builder_musconv
+        
+        for wchain in ["findmuon","musconv"]:
+            if trigger != wchain: builder.pop(wchain,None)
+        
+        builder.structure = structure
+        
+        return builder
+        
+    def setup(self):
+        #key, class, outputs namespace.
+        if "findmuon" in self.inputs:
+            self.ctx.key = "findmuon"
+            self.ctx.workchain = FindMuonWorkChain
+        elif "musconv" in self.inputs:
+            self.ctx.key = "musconv"
+            self.ctx.workchain = MusconvWorkChain
+            
+    
+    def implant_muon(self):
+        """Run a WorkChain for vibrational properties."""
+        #maybe we can unify this, thanks to a wise setup.
+        inputs = AttributeDict(self.exposed_inputs(self.ctx.workchain, namespace=self.ctx.key))
+        inputs.metadata.call_link_label = self.ctx.key
+        
+        future = self.submit(self.ctx.workchain, **inputs)
+        self.report(f'submitting `WorkChain` <PK={future.pk}>')
+        self.to_context(**{self.ctx.key: future})
+
+    def results(self):
+        """Inspect all sub-processes."""
+        workchain = self.ctx[self.ctx.key]
+
+        if not workchain.is_finished_ok:
+            self.report(f'the child WorkChain with <PK={workchain.pk}> failed')
+            return self.exit_codes.ERROR_WORKCHAIN_FAILED
+
+        self.out_many(self.exposed_outputs(self.ctx[self.ctx.key], self.ctx.workchain, namespace=self.ctx.key))
