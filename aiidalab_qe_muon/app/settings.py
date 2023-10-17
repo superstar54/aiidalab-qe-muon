@@ -62,7 +62,7 @@ class Setting(Panel):
         )
         
         #start Supercell
-        self.supercell=[2,2,2]
+        self.supercell=[1,1,1]
         def change_supercell(_=None):
             self.supercell = [
                 self._sc_x.value,
@@ -72,7 +72,7 @@ class Setting(Panel):
             self._display_mesh()
             
         for elem in ["x","y","z"]:
-            setattr(self,"_sc_"+elem,ipw.BoundedIntText(value=2, min=1, layout={"width": "40px"},disabled=True))
+            setattr(self,"_sc_"+elem,ipw.BoundedIntText(value=1, min=1, layout={"width": "40px"},disabled=True))
         
         for elem in [self._sc_x,self._sc_y,self._sc_z]:
             elem.observe(change_supercell, names="value")
@@ -287,7 +287,7 @@ class Setting(Panel):
         """Load a dictionary with the input parameters for the plugin."""
         self.charged_muon.value = input_dict.get("charged_muon", "on")
         self.compute_supercell = input_dict.get("compute_supercell",False)
-        self.supercell = input_dict.get("supercell_selector", [2,2,2])
+        self.supercell = input_dict.get("supercell_selector", [1,1,1])
         self.kpoints_distance = input_dict.get("kpoints_distance", 0.3)
         self.mu_spacing = input_dict.get("mu_spacing", 1)
         self.magmoms = input_dict.get("magmoms",None)
