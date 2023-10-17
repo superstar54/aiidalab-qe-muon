@@ -1,8 +1,18 @@
 from aiida.orm import load_code, Dict, Bool
-from aiida.plugins import WorkflowFactory
+from aiida.plugins import WorkflowFactory, DataFactory
 from aiida_quantumespresso.common.types import ElectronicType, SpinType
 
+from aiida_quantumespresso.data.hubbard_structure import HubbardStructureData
+
 ImplantMuonWorkChain = WorkflowFactory("muon_app.implant_muon")
+
+"""try:
+    DataFactory("atomistic.structure")
+    old_structuredata=False
+except:
+    old_structuredata=True"""
+    
+old_structuredata=True
 
 def get_builder(codes, structure, parameters):
     from copy import deepcopy
@@ -21,6 +31,9 @@ def get_builder(codes, structure, parameters):
     charge_supercell = parameters["muonic"].pop("charge_supercell",True)
     
     hubbard = parameters["muonic"].pop("hubbard",False)
+    
+    if hubbard and old_structuredata:
+        structure = HubbardStructureData.from_structure(structure)
     
     if compute_supercell:
         sc_matrix = None
