@@ -69,6 +69,7 @@ class Setting(Panel):
                 self._sc_y.value,
                 self._sc_z.value,
             ]
+            self._display_mesh()
             
         for elem in ["x","y","z"]:
             setattr(self,"_sc_"+elem,ipw.BoundedIntText(value=2, min=1, layout={"width": "40px"},disabled=True))
@@ -200,8 +201,11 @@ class Setting(Panel):
         if self.input_structure is None:
             return
         if self.kpoints_distance.value > 0:
+            supercell_ = self.input_structure.get_pymatgen()
+            supercell_ = supercell_.make_supercell(self.supercell)
+            supercell = orm.StructureData(pymatgen=supercell_)
             mesh = create_kpoints_from_distance(
-                self.input_structure,
+                supercell,
                 orm.Float(self.kpoints_distance.value),
                 orm.Bool(True),
             )
