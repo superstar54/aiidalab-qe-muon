@@ -42,7 +42,7 @@ tests = [
 ]
 
 [project.entry-points."aiidalab_qe.properties"]
-"muonic" = "aiidalab_qe_muon.workflows:property"
+"muonic" = "aiidalab_qe_muon.app:property"
 
 [project.entry-points."aiida.workflows"]
 "muon_app.implant_muon" = "aiidalab_qe_muon.workflows.implantmuonworkchain:ImplantMuonWorkChain"

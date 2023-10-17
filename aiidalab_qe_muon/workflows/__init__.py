@@ -1,15 +1,6 @@
-from aiidalab_qe_muon.workflows.settings import Setting
-from aiidalab_qe_muon.workflows.workchain import workchain_and_builder
-#from aiidalab_qe_vibroscopy.workflows.result import Result
-from aiidalab_qe.common.panel import OutlinePanel
+# -*- coding: utf-8 -*-
+#
+# The AiiDAlab plugin for aiida-muon
+#
+__version__ = "0.0.1"
 
-
-class Outline(OutlinePanel):
-    title = "Muon spectroscopy"
-
-property ={
-"outline": Outline,
-"setting": Setting,
-"workchain": workchain_and_builder,
-#"result": Result,
-}

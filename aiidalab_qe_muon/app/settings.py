@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Panel for PhononWorkchain plugin.
+"""Panel for FindMuonWorkchain plugin.
 
 Authors:
 
@@ -15,6 +15,7 @@ from aiida_quantumespresso.calculations.functions.create_kpoints_from_distance i
 from aiidalab_qe.common.panel import Panel
 
 from aiida_muon.workflows.find_muon import gensup, niche_add_impurities
+
 
 class Setting(Panel):
     title = "Muon Settings"
@@ -99,6 +100,22 @@ class Setting(Panel):
         )
         #end Supercell.
         
+        #start enable Hubbard. Temporary
+        self.hubbard_label = ipw.Label(
+            "Enable Hubbard correction: ", 
+            layout=ipw.Layout(justify_content="flex-start"),
+            )
+        self.hubbard = ipw.Checkbox(
+            description="",
+            indent=False,
+            value=True,
+        )
+        self.hubbard_widget = ipw.HBox(
+            [self.hubbard_label, self.hubbard],
+            layout=ipw.Layout(justify_content="flex-start"),
+        )
+        #end enable Hubbard
+        
         #start kpoints distance: the code is the same as the advanced settings.
         self.kpoints_description = ipw.HTML(
             """<div style="line-height: 140%; padding-top: 5px; padding-bottom: 5px">
@@ -140,10 +157,16 @@ class Setting(Panel):
         self.number_of_supercells = ipw.HTML()
         #end mu spacing.
         
+        #start TEMPORARY magnetic moments settings. this should be in the structure creation.
+        #self.sites_widget = SitesWidgets(self)
+        self.moments = ipw.HTML()
+        #end
+        
         self.children = [
             self.settings_title,
             self.settings_help,
             self.supercell_known_widget,
+            self.hubbard_widget,
             self.charge_help,
             ipw.HBox(
                 children=[
@@ -158,6 +181,7 @@ class Setting(Panel):
             ipw.HBox([self.kpoints_distance, self.mesh_grid]),
             self.mu_spacing_description,
             ipw.HBox([self.mu_spacing, self.number_of_supercells]),
+            self.moments,
         ]
         super().__init__(**kwargs)
         
@@ -166,6 +190,7 @@ class Setting(Panel):
         if self.input_structure is not None:
             self._display_mesh()
             self._estimate_supercells()
+            self._display_moments()
             
     def _compute_supercell(self, change):
         for elem in [self._sc_x,self._sc_y,self._sc_z]:
@@ -199,6 +224,35 @@ class Setting(Panel):
             sc_matrix = [[self.supercell[0],0,0],[0,self.supercell[1],0],[0,0,self.supercell[2]]]
             supercell_list = gensup(self.input_structure.get_pymatgen(), mu_lst, sc_matrix)  # ordinary function           
             self.number_of_supercells.value = "Number of supercells: "+str(len(supercell_list))
+    
+    def _display_moments(self, _=None):
+        """
+        Display the magnetic moments and set the magmoms inputs for the simulation.
+        """
+        if self.input_structure is None:
+            self.moments=ipw.HTML()
+        elif self.input_structure and "magmom" in self.input_structure.base.extras.keys():
+            text = ""
+            magmoms = self.input_structure.base.extras.get("magmom")
+            text += "<h5><b>Magnetic moments in the unit cell</b></h5>"
+            for site,magmom in zip(self.input_structure.sites,magmoms):
+                text+=f'<p>{site.kind_name}, in {str(site.position)}: {str(magmom)}</p>'
+            self.moments.value = text
+            self.magmoms = magmoms
+        pass
+         
+    def SitesWidget(self,):
+        """
+        Widget to display sites and relative magnetic moment. 
+        For now, magmoms can be modified by the user.
+        """
+        if self.input_structure is None:
+            return
+        else:
+            for site in self.input_structure.sites:
+                pass
+            
+        return
         
         
         
@@ -212,6 +266,8 @@ class Setting(Panel):
                 "kpoints_distance": self.kpoints_distance.value,
                 "mu_spacing": self.mu_spacing.value,
                 "compute_supercell":self.compute_supercell.value,
+                "magmoms":self.magmoms,
+                "hubbard":self.hubbard.value
                 }
         return {
                 "supercell_selector": self.supercell,
@@ -219,6 +275,8 @@ class Setting(Panel):
                 "kpoints_distance": self.kpoints_distance.value,
                 "mu_spacing": self.mu_spacing.value,
                 "compute_supercell":self.compute_supercell.value,
+                "magmoms":self.magmoms,
+                "hubbard":self.hubbard.value
                 }
 
     def load_panel_value(self, input_dict):
@@ -228,3 +286,5 @@ class Setting(Panel):
         self.supercell = input_dict.get("supercell_selector", [2,2,2])
         self.kpoints_distance = input_dict.get("kpoints_distance", 0.3)
         self.mu_spacing = input_dict.get("mu_spacing", 1)
+        self.magmoms = input_dict.get("magmoms",None)
+        self.hubbard = input_dict.get("hubbard",False)

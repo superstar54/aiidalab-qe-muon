@@ -10,6 +10,21 @@ from aiida.engine import WorkChain, calcfunction, if_
 
 MusconvWorkChain = WorkflowFactory('musconv')
 FindMuonWorkChain = WorkflowFactory('muon.find_muon')
+PwRelaxWorkChain = WorkflowFactory('quantumespresso.pw.relax')
+original_PwRelaxWorkChain = WorkflowFactory('quantumespresso.pw.relax')
+
+
+def FindMuonWorkChain_override_validator(inputs,ctx=None):
+    """validate inputs for musconv.relax; actually, it is
+    just a way to avoid defining it if we do not want it. 
+    otherwise the default check is done and it will excepts. 
+    """
+    return None
+    
+FindMuonWorkChain.spec().inputs.validator = FindMuonWorkChain_override_validator
+
+def implant_input_validator(inputs, ctx=None):
+    return None
 
 class ImplantMuonWorkChain(WorkChain):
     "WorkChain to compute muon stopping sites in a crystal."
@@ -22,7 +37,6 @@ class ImplantMuonWorkChain(WorkChain):
         
         spec.input('structure', valid_type=StructureData) #Maybe not needed as input... just in the protocols. but in this way it is not easy to automate it in the app, after the relaxation. So let's keep it for now. 
 
-
         spec.expose_inputs(
             MusconvWorkChain,
             namespace='musconv',
@@ -30,7 +44,7 @@ class ImplantMuonWorkChain(WorkChain):
             namespace_options={
                 'required': False,
                 'populate_defaults': False,
-                'help': 'Inputs for the `MusconvWorkChain`.',
+                'help': 'Inputs for the `MusconvWorkChain`.',           
             }
         )
         spec.expose_inputs(
@@ -42,8 +56,7 @@ class ImplantMuonWorkChain(WorkChain):
                 'populate_defaults': False,
                 'help': (
                     'Inputs for the `FindMuonWorkChain` that will be'
-                    'used to calculate the muon stopping sites.'
-                )
+                    'used to calculate the muon stopping sites.'),
             },
             #exclude=('symmetry')
         )
@@ -57,7 +70,9 @@ class ImplantMuonWorkChain(WorkChain):
         ###
         spec.expose_outputs(
             FindMuonWorkChain, namespace='findmuon',
-            namespace_options={'required': False, 'help':'Outputs of the `PhononWorkChain`.'},
+            namespace_options={
+                'required': False, 
+                'help':'Outputs of the `PhononWorkChain`.'},
         )
         spec.expose_outputs(
             MusconvWorkChain, namespace='musconv',
@@ -65,12 +80,15 @@ class ImplantMuonWorkChain(WorkChain):
         )
         ###
         spec.exit_code(400, 'ERROR_WORKCHAIN_FAILED', message='The workchain failed.')
+        ###
+        spec.inputs.validator = implant_input_validator
     
     @classmethod
     def get_builder_from_protocol(
         cls,
         pw_code,
         structure,
+        pseudo_family: str ="SSSP/1.2/PBE/efficiency",
         pp_code=None,
         protocol=None,
         overrides: dict = {},
@@ -113,23 +131,31 @@ class ImplantMuonWorkChain(WorkChain):
                 structure=structure,
                 protocol=protocol,
                 overrides=overrides,
-                relax_musconv=relax_musconv,
+                relax_musconv=relax_musconv, #relaxation of unit cell already done if needed.
                 magmom=magmom,
                 sc_matrix=sc_matrix,
                 mu_spacing=mu_spacing,
                 kpoints_distance=kpoints_distance,
                 charge_supercell=charge_supercell,
+                pseudo_family=pseudo_family,
                 **kwargs
             )
-            builder.findmuon = builder_findmuon
-            builder.pop("musconv")
-        
+            #builder.findmuon = builder_findmuon
+            for k,v in builder_findmuon.items():
+                setattr(builder.findmuon,k,v)   
+            
+            #I have to set this, otherwise we have no parameters. TOBE understood.
+            builder.findmuon.musconv.relax.base.pw.parameters = Dict({})
+            if sc_matrix:
+                builder.findmuon.musconv.pwscf.pw.parameters = Dict({})
+                    
         elif trigger == "musconv":
             builder_musconv = MusconvWorkChain.get_builder_from_protocol(
                 code=pw_code,
                 structure=structure,
                 protocol=protocol,
                 overrides=overrides,
+                pseudo_family=pseudo_family,
                 **kwargs
             )
             builder.musconv = builder_musconv
