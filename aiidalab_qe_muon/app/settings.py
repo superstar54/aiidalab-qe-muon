@@ -49,7 +49,7 @@ class Setting(Panel):
             </div>"""
         )
         
-        self.charged_muon = ipw.ToggleButtons(
+        self.charged_muon_ = ipw.ToggleButtons(
             options=[("Muon (+1)", "on"), ("Muonium (neutral)", "off")],
             value="on",
             style={"description_width": "initial"},
@@ -87,35 +87,54 @@ class Setting(Panel):
             "Compute supercell: ", 
             layout=ipw.Layout(justify_content="flex-start"),
             )
-        self.compute_supercell = ipw.Checkbox(
+        self.compute_supercell_ = ipw.Checkbox(
             description="",
             indent=False,
             value=True,
         )
         #enable supercell setting
-        self.compute_supercell.observe(self._compute_supercell,"value")
+        self.compute_supercell_.observe(self._compute_supercell,"value")
             
         self.supercell_known_widget = ipw.HBox(
-            [self.supercell_label, self.compute_supercell,self.supercell_selector],
+            [self.supercell_label, self.compute_supercell_,self.supercell_selector],
             layout=ipw.Layout(justify_content="flex-start"),
         )
         #end Supercell.
         
         #start enable Hubbard. Temporary
-        self.hubbard_label = ipw.Label(
+        self.hubbard__label = ipw.Label(
             "Enable Hubbard correction: ", 
             layout=ipw.Layout(justify_content="flex-start"),
             )
-        self.hubbard = ipw.Checkbox(
+        self.hubbard_ = ipw.Checkbox(
             description="",
             indent=False,
             value=True,
         )
-        self.hubbard_widget = ipw.HBox(
-            [self.hubbard_label, self.hubbard],
+        self.hubbard__widget = ipw.HBox(
+            [self.hubbard__label, self.hubbard_],
             layout=ipw.Layout(justify_content="flex-start"),
         )
-        #end enable Hubbard
+        #end enable Hubbard.
+        
+        #start enable spin_polarised DFT calcs.
+        self.spin_pol_label = ipw.Label(
+            "Enable spin polarised DFT: ", 
+            layout=ipw.Layout(justify_content="flex-start"),
+            )
+        self.spin_pol_ = ipw.Checkbox(
+            description="",
+            indent=False,
+            value=True,
+            layout=ipw.Layout(justify_content="flex-start"),
+        )
+        self.spin_pol_description = ipw.Label(
+            """In case of magnetic system, it computes also the contact hyperfine field.""")
+        self.spin_pol_widget = ipw.HBox(
+            [self.spin_pol_label, self.spin_pol_,self.spin_pol_description],
+            #layout=ipw.Layout(justify_content="flex-start"),
+        )
+        #end enable spin_polarised DFT calcs.
         
         #start kpoints distance: the code is the same as the advanced settings.
         self.kpoints_description = ipw.HTML(
@@ -126,7 +145,7 @@ class Setting(Panel):
             reciprocal space.</div>"""
         )
         
-        self.kpoints_distance = ipw.BoundedFloatText(
+        self.kpoints_distance_ = ipw.BoundedFloatText(
             min=0.0,
             step=0.05,
             value=0.3,
@@ -134,7 +153,7 @@ class Setting(Panel):
             disabled=False,
             style={"description_width": "initial"},
         )
-        self.kpoints_distance.observe(self._display_mesh, "value")
+        self.kpoints_distance_.observe(self._display_mesh, "value")
         self.mesh_grid = ipw.HTML()
         #end kpoints distance.
         
@@ -146,7 +165,7 @@ class Setting(Panel):
             Muons distance in Å for different candidate positions in the choosen supercell.</div>"""
         )
         
-        self.mu_spacing = ipw.BoundedFloatText(
+        self.mu_spacing_ = ipw.BoundedFloatText(
             min=0.05,
             step=0.05,
             value=1.0,
@@ -154,7 +173,7 @@ class Setting(Panel):
             disabled=False,
             style={"description_width": "initial"},
         )
-        self.mu_spacing.observe(self._estimate_supercells, "value")
+        self.mu_spacing_.observe(self._estimate_supercells, "value")
         self.number_of_supercells = ipw.HTML()
         #end mu spacing.
         
@@ -167,21 +186,22 @@ class Setting(Panel):
             self.settings_title,
             self.settings_help,
             self.supercell_known_widget,
-            self.hubbard_widget,
+            self.hubbard__widget,
+            self.spin_pol_widget,
             self.charge_help,
             ipw.HBox(
                 children=[
                     ipw.Label(
                         "Charge state:",
-                        layout=ipw.Layout(justify_content="flex-start",),
+                        layout=ipw.Layout(justify_content="flex-start"),
                     ),
-                    self.charged_muon,
+                    self.charged_muon_,
                 ]
             ),
             self.kpoints_description,
-            ipw.HBox([self.kpoints_distance, self.mesh_grid]),
+            ipw.HBox([self.kpoints_distance_, self.mesh_grid]),
             self.mu_spacing_description,
-            ipw.HBox([self.mu_spacing, self.number_of_supercells]),
+            ipw.HBox([self.mu_spacing_, self.number_of_supercells]),
             self.moments,
         ]
         super().__init__(**kwargs)
@@ -200,13 +220,13 @@ class Setting(Panel):
     def _display_mesh(self, _=None):
         if self.input_structure is None:
             return
-        if self.kpoints_distance.value > 0:
+        if self.kpoints_distance_.value > 0:
             supercell_ = self.input_structure.get_pymatgen()
             supercell_ = supercell_.make_supercell(self.supercell)
             supercell = orm.StructureData(pymatgen=supercell_)
             mesh = create_kpoints_from_distance(
                 supercell,
-                orm.Float(self.kpoints_distance.value),
+                orm.Float(self.kpoints_distance_.value),
                 orm.Bool(True),
             )
             self.mesh_grid.value = "Mesh " + str(mesh.get_kpoints_mesh()[0])
@@ -222,7 +242,7 @@ class Setting(Panel):
             return
         else:
             mu_lst = niche_add_impurities(
-                self.input_structure, orm.Str("H"), orm.Float(self.mu_spacing.value), orm.Float(1.0)
+                self.input_structure, orm.Str("H"), orm.Float(self.mu_spacing_.value), orm.Float(1.0)
             )
             
             sc_matrix = [[self.supercell[0],0,0],[0,self.supercell[1],0],[0,0,self.supercell[2]]]
@@ -235,6 +255,7 @@ class Setting(Panel):
         """
         if self.input_structure is None:
             self.moments=ipw.HTML()
+            self.magmoms = None
         elif self.input_structure and "magmom" in self.input_structure.base.extras.keys():
             text = ""
             magmoms = self.input_structure.base.extras.get("magmom")
@@ -243,6 +264,12 @@ class Setting(Panel):
                 text+=f'<p>{site.kind_name}, in {str(site.position)}: {str(magmom)}</p>'
             self.moments.value = text
             self.magmoms = magmoms
+        else:
+            self.magmoms = None
+        
+        if not self.magmoms:
+            self.spin_pol_.value = False
+            self.spin_pol_.disabled = True
         pass
          
     def SitesWidget(self,):
@@ -263,32 +290,36 @@ class Setting(Panel):
     def get_panel_value(self):
         """Return a dictionary with the input parameters for the plugin."""
 
-        if isinstance(self.charged_muon,str):
-            return {
-                "supercell_selector": self.supercell,
-                "charged_muon": self.charged_muon,
-                "kpoints_distance": self.kpoints_distance.value,
-                "mu_spacing": self.mu_spacing.value,
-                "compute_supercell":self.compute_supercell.value,
-                "magmoms":self.magmoms,
-                "hubbard":self.hubbard.value
-                }
         return {
                 "supercell_selector": self.supercell,
-                "charged_muon": self.charged_muon.value,
-                "kpoints_distance": self.kpoints_distance.value,
-                "mu_spacing": self.mu_spacing.value,
-                "compute_supercell":self.compute_supercell.value,
+                "charged_muon": self.charged_muon_.value,
+                "kpoints_distance": self.kpoints_distance_.value,
+                "mu_spacing": self.mu_spacing_.value,
+                "compute_supercell":self.compute_supercell_.value,
                 "magmoms":self.magmoms,
-                "hubbard":self.hubbard.value
+                "hubbard":self.hubbard_.value,
+                "spin_pol":self.spin_pol_.value,
                 }
 
     def load_panel_value(self, input_dict):
         """Load a dictionary with the input parameters for the plugin."""
-        self.charged_muon.value = input_dict.get("charged_muon", "on")
-        self.compute_supercell = input_dict.get("compute_supercell",False)
+        self.charged_muon_.value = input_dict.get("charged_muon", "on")
+        self.compute_supercell_.value = input_dict.get("compute_supercell",False)
         self.supercell = input_dict.get("supercell_selector", [1,1,1])
-        self.kpoints_distance = input_dict.get("kpoints_distance", 0.3)
-        self.mu_spacing = input_dict.get("mu_spacing", 1)
+        self.kpoints_distance_.value = input_dict.get("kpoints_distance", 0.3)
+        self.mu_spacing_.value = input_dict.get("mu_spacing", 1)
         self.magmoms = input_dict.get("magmoms",None)
-        self.hubbard = input_dict.get("hubbard",False)
+        self.hubbard_.value = input_dict.get("hubbard",False)
+        self.spin_pol_.value = input_dict.get("spin_pol",True)
+        
+    def reset(self):
+        """Reset the panel"""
+        self.charged_muon_.value = "on"
+        self.compute_supercell_.value = True
+        self.supercell = [1,1,1]
+        self.kpoints_distance_.value = 0.3
+        self.mu_spacing_.value = 1
+        self.magmoms = None
+        self.hubbard_.value = True
+        self.spin_pol_.value = True
+

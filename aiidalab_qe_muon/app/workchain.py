@@ -57,7 +57,7 @@ def get_builder(codes, structure, parameters):
         protocol=protocol,
         overrides=overrides,
         trigger=trigger,
-        relax_musconv=False, #but not true in the construction; in the end you relax in the first step of the QeAppWorkchain.
+        relax_unitcell=False, #but not true in the construction; in the end you relax in the first step of the QeAppWorkchain.
         magmom=magmom,
         sc_matrix=sc_matrix,
         mu_spacing=mu_spacing,
