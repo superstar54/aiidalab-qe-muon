@@ -227,7 +227,7 @@ class Setting(Panel):
             mesh = create_kpoints_from_distance(
                 supercell,
                 orm.Float(self.kpoints_distance_.value),
-                orm.Bool(True),
+                orm.Bool(False),
             )
             self.mesh_grid.value = "Mesh " + str(mesh.get_kpoints_mesh()[0])
         else:
