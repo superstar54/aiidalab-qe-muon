@@ -19,7 +19,7 @@ def get_builder(codes, structure, parameters):
     
     protocol = parameters["workchain"].pop("protocol", "fast")
     pw_code = codes.get("pw")
-    pp_code = codes.get("pp", None)
+    pp_code = codes.get("pp_code", None)
     
     magmom = parameters["muonic"].pop("magmoms",None)
     supercell = parameters["muonic"].pop("supercell_selector", None)
