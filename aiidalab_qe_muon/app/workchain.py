@@ -80,8 +80,7 @@ def get_builder(codes, structure, parameters):
     }
     if pp_code:
         builder.findmuon.pp_metadata = pp_metadata
-
-    
+        
     return builder
 
 
