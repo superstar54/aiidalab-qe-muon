@@ -28,7 +28,7 @@ def get_builder(codes, structure, parameters):
     compute_supercell = parameters["muonic"].pop("compute_supercell", False)
     mu_spacing = parameters["muonic"].pop("mu_spacing",1.0)
     kpoints_distance = parameters["muonic"].pop("kpoints_distance",0.301)
-    charge_supercell = parameters["muonic"].pop("charge_supercell",True)
+    charge_supercell = parameters["muonic"].pop("charged_muon",True)
     
     hubbard = parameters["muonic"].pop("hubbard",False)
     

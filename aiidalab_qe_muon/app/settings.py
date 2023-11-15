@@ -9,6 +9,7 @@ Authors:
 import ipywidgets as ipw
 from aiida import orm
 import traitlets as tl
+import numpy as np
 from aiida_quantumespresso.calculations.functions.create_kpoints_from_distance import (
     create_kpoints_from_distance,
 )
@@ -50,8 +51,8 @@ class Setting(Panel):
         )
         
         self.charged_muon_ = ipw.ToggleButtons(
-            options=[("Muon (+1)", "on"), ("Muonium (neutral)", "off")],
-            value="on",
+            options=[("Muon (+1)", True), ("Muonium (neutral)", False)],
+            value=True,
             style={"description_width": "initial"},
         )
         #end charge
@@ -70,7 +71,8 @@ class Setting(Panel):
                 self._sc_z.value,
             ]
             self._display_mesh()
-            
+            self._write_html_supercell()
+             
         for elem in ["x","y","z"]:
             setattr(self,"_sc_"+elem,ipw.BoundedIntText(value=1, min=1, layout={"width": "40px"},disabled=True))
         
@@ -95,13 +97,30 @@ class Setting(Panel):
         #enable supercell setting
         self.compute_supercell_.observe(self._compute_supercell,"value")
             
-        self.supercell_known_widget = ipw.HBox(
-            [self.supercell_label, self.compute_supercell_,self.supercell_selector],
-            layout=ipw.Layout(justify_content="flex-start"),
+        #supercell data
+        self.supercell_hint_button = ipw.Button(
+            description="Size hint",
+            disabled=True,
+            width='500px',
+        )
+        #supercell hint (9A lattice params)
+        self.supercell_hint_button.on_click(self._suggest_supercell)
+        
+        self.supercell_html = ipw.HTML(display="none")
+                
+        self.supercell_known_widget = ipw.VBox([
+            ipw.HBox([
+                self.supercell_label, 
+                self.compute_supercell_,
+                self.supercell_hint_button,
+                self.supercell_selector,],
+                layout=ipw.Layout(justify_content="flex-start"),),
+            self.supercell_html,
+            ],    
         )
         #end Supercell.
         
-        #start enable Hubbard. Temporary
+        #start enable Hubbard. Temporary, with the LegacyStructureData.
         self.hubbard__label = ipw.Label(
             "Enable Hubbard correction: ", 
             layout=ipw.Layout(justify_content="flex-start"),
@@ -216,6 +235,9 @@ class Setting(Panel):
     def _compute_supercell(self, change):
         for elem in [self._sc_x,self._sc_y,self._sc_z]:
             elem.disabled = change["new"]
+        self.supercell_hint_button.disabled = change["new"]
+        self._write_html_supercell()
+        self.supercell_html.layout.display = 'none' if change["new"] else "block"
             
     def _display_mesh(self, _=None):
         if self.input_structure is None:
@@ -232,7 +254,42 @@ class Setting(Panel):
             self.mesh_grid.value = "Mesh " + str(mesh.get_kpoints_mesh()[0])
         else:
             self.mesh_grid.value = "Please select a number higher than 0.0"
+    
+    def _suggest_supercell(self, _=None):
+        """
+        minimal supercell size for muons, imposing a min_dist (lattice parameter) of 9 A. 
+        Around 8 for metal is fine, for semiconductors it has to be verified.
+        """
+        if self.input_structure:
+            s = self.input_structure.get_pymatgen()
+            suggested = 9//np.array(s.lattice.abc) + 1
+            self._sc_x.value = suggested[0]
+            self._sc_y.value = suggested[1]
+            self._sc_z.value = suggested[2]
+        else:
+            return 
+        
+    def _write_html_supercell(self, _=None):
+        #write html for supercell data:
+        if self.input_structure:
+            s = self.input_structure.get_pymatgen()
+            s = s.make_supercell(self.supercell)
+            sc_html="Supercell lattice parameters, angles and volume: "
+            abc = np.round(s.lattice.abc,3)
+            alfa_beta_gamma = np.round(s.lattice.angles,1)
+            sc_html += f"a="+str(abc[0])+"Å, "
+            sc_html += f"b="+str(abc[1])+"Å, "
+            sc_html += f"c="+str(abc[2])+"Å; "
             
+            sc_html += f"α="+str(alfa_beta_gamma[0])+"Å, "
+            sc_html += f"β="+str(alfa_beta_gamma[1])+"Å, "
+            sc_html += f"γ="+str(alfa_beta_gamma[2])+"Å; "
+            
+            sc_html += f"V={round(s.lattice.volume,3)}Å<sup>3</sup>"
+            
+            self.supercell_html.value = sc_html
+        
+              
     def _estimate_supercells(self, _=None):
         """estimate the number of supercells, given sc_matrix and mu_spacing.
         this is copied from the FindMuonWorkChain, it is code duplication.
@@ -303,7 +360,7 @@ class Setting(Panel):
 
     def load_panel_value(self, input_dict):
         """Load a dictionary with the input parameters for the plugin."""
-        self.charged_muon_.value = input_dict.get("charged_muon", "on")
+        self.charged_muon_.value = input_dict.get("charged_muon", True)
         self.compute_supercell_.value = input_dict.get("compute_supercell",False)
         self.supercell = input_dict.get("supercell_selector", [1,1,1])
         self.kpoints_distance_.value = input_dict.get("kpoints_distance", 0.3)
@@ -314,7 +371,7 @@ class Setting(Panel):
         
     def reset(self):
         """Reset the panel"""
-        self.charged_muon_.value = "on"
+        self.charged_muon_.value = True
         self.compute_supercell_.value = True
         self.supercell = [1,1,1]
         self.kpoints_distance_.value = 0.3
