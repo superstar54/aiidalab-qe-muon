@@ -171,7 +171,7 @@ class SingleMuonBarPlotWidget(ipw.VBox):
                 size=12,
                 color='#333333',
             ),
-            #plot_bgcolor='white', # Background color of the plot
+            plot_bgcolor='gainsboro', # Background color of the plot
             #paper_bgcolor='white', # Background color of the paper
 
             bargap=0.001, # Gap between bars
@@ -393,7 +393,7 @@ class MuonSummaryBarPlotWidget(ipw.VBox):
                 size=12,
                 color='#333333',
             ),
-            #plot_bgcolor='white', # Background color of the plot
+            plot_bgcolor='gainsboro', # Background color of the plot
             #paper_bgcolor='white', # Background color of the paper
 
             #bargap=0.000001, # Gap between bars
