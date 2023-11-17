@@ -30,81 +30,73 @@ change_names_for_html = {
 
 
 #(1) pandas.
-def produce_muonic_dataframe(qeapp_node):
-    if "muonic" in qeapp_node.outputs: 
-        if "findmuon" in qeapp_node.outputs.muonic:
-            bars = {
-                "magnetic_units":"tesla",
-                "magnetic_keys":["B_T","Bdip","B_T_norm","hyperfine_norm","hyperfine","Bdip_norm"],
-                "muons":{}
-            }
-            for idx, uuid in qeapp_node.outputs.muonic.findmuon.all_index_uuid.get_dict().items():
-                if idx in qeapp_node.outputs.muonic.findmuon.unique_sites.get_dict().keys():
-                    relaxwc = orm.load_node(uuid)
-                    bars["muons"][idx] = {}
-                    bars["muons"][idx]['tot_energy'] = relaxwc.outputs.output_parameters.get_dict()["energy"]
-                    bars["muons"][idx]['structure'] = relaxwc.outputs.output_structure
-                    bars["muons"][idx]['muon_index'] = idx
-                    bars["muons"][idx]['muon_position_cc'] = list(
-                        np.round(np.array(
-                            qeapp_node.outputs.muonic.findmuon.unique_sites.get_dict()[idx][0]["sites"][-1]["abc"]
-                            ),3),
-                    )
+def produce_muonic_dataframe(findmuon_output_node):
 
-            if "unique_sites_dipolar" in qeapp_node.outputs.muonic.findmuon:
-                for configuration in qeapp_node.outputs.muonic.findmuon.unique_sites_dipolar.get_list():
-                    for B in ["B_T","Bdip"]:
-                        bars["muons"][str(configuration["idx"])][B] = list(np.round(np.array(configuration[B]),3))
-                        if B in ["B_T_norm"]:
-                            bars["muons"][str(configuration["idx"])]["B_T_norm"] = round(configuration[B],3)
-                        if B in ["Bdip"]:
-                            bars["muons"][str(configuration["idx"])]["Bdip_norm"] = round(np.linalg.norm(np.array(configuration[B])),3)
-                    if "unique_sites_hyperfine" in qeapp_node.outputs.muonic.findmuon:
-                        v = qeapp_node.outputs.muonic.findmuon.unique_sites_hyperfine.get_dict()[str(configuration["idx"])]
-                        #bars["muons"][str(configuration["idx"])]["hyperfine"] = v
-                        bars["muons"][str(configuration["idx"])]["hyperfine_norm"] = round(abs(v[-1]),3) #<-- we select the last, is in T (the first is in Atomic units).
-            
-            #<HERE>: filter only unique sites.
-            #</HERE>
-            df = pd.DataFrame.from_dict(bars["muons"])
+    bars = {
+        "magnetic_units":"tesla",
+        "magnetic_keys":["B_T","Bdip","B_T_norm","hyperfine_norm","hyperfine","Bdip_norm"],
+        "muons":{}
+    }
+    for idx, uuid in findmuon_output_node.all_index_uuid.get_dict().items():
+        if idx in findmuon_output_node.unique_sites.get_dict().keys():
+            relaxwc = orm.load_node(uuid)
+            bars["muons"][idx] = {}
+            bars["muons"][idx]['tot_energy'] = relaxwc.outputs.output_parameters.get_dict()["energy"]
+            bars["muons"][idx]['structure'] = relaxwc.outputs.output_structure
+            bars["muons"][idx]['muon_index'] = idx
+            bars["muons"][idx]['muon_position_cc'] = list(
+                np.round(np.array(
+                    findmuon_output_node.unique_sites.get_dict()[idx][0]["sites"][-1]["abc"]
+                    ),3),
+            )
 
-            #sort
-            df = df.sort_values("tot_energy",axis=1)
+    if "unique_sites_dipolar" in findmuon_output_node:
+        for configuration in findmuon_output_node.unique_sites_dipolar.get_list():
+            for B in ["B_T","Bdip"]:
+                bars["muons"][str(configuration["idx"])][B] = list(np.round(np.array(configuration[B]),3))
+                if B in ["B_T"]:
+                    bars["muons"][str(configuration["idx"])]["B_T_norm"] = round(np.linalg.norm(np.array(configuration[B])),3)
+                if B in ["Bdip"]:
+                    bars["muons"][str(configuration["idx"])]["Bdip_norm"] = round(np.linalg.norm(np.array(configuration[B])),3)
+            if "unique_sites_hyperfine" in findmuon_output_node:
+                v = findmuon_output_node.unique_sites_hyperfine.get_dict()[str(configuration["idx"])]
+                #bars["muons"][str(configuration["idx"])]["hyperfine"] = v
+                bars["muons"][str(configuration["idx"])]["hyperfine_norm"] = round(abs(v[-1]),3) #<-- we select the last, is in T (the first is in Atomic units).
+    
+    #<HERE>: filter only unique sites.
+    #</HERE>
+    df = pd.DataFrame.from_dict(bars["muons"])
 
-            #deltaE
-            df.loc["delta_E"] = df.loc["tot_energy"] - df.loc["tot_energy"].min()
-            return df
-        else:
-            return None
-    else:
-        return None
+    #sort
+    df = df.sort_values("tot_energy",axis=1)
+
+    #deltaE
+    df.loc["delta_E"] = df.loc["tot_energy"] - df.loc["tot_energy"].min()
+    return df
+    
 
 #(2) unit cell with all muonic sites.
 
-def produce_collective_unit_cell(qeapp_node):
-    if "muonic" in qeapp_node.outputs: 
-        if "findmuon" in qeapp_node.outputs.muonic:
-            #e_min=np.min([qeapp_node.outputs.unique_sites.get_dict()[key][1] for key in qeapp_node.outputs.unique_sites.get_dict()])
-            sc_matrix=qeapp_node.inputs.muonic.findmuon.sc_matrix.get_list() #WE NEED TO HANDLE also THE CASE IN WHICH IS GENERATED BY MUSCONV.
-            input_str = qeapp_node.inputs.structure.get_pymatgen().copy()
+def produce_collective_unit_cell(findmuon_output_node):
+    
+    #e_min=np.min([qeapp_node.outputs.unique_sites.get_dict()[key][1] for key in qeapp_node.outputs.unique_sites.get_dict()])
+    sc_matrix=findmuon_output_node.all_index_uuid.creator.caller.inputs.sc_matrix.get_list() #WE NEED TO HANDLE also THE CASE IN WHICH IS GENERATED BY MUSCONV.
+    input_str = findmuon_output_node.all_index_uuid.creator.caller.inputs.structure.get_pymatgen().copy()
 
-            #append tags to recognize the muon site.
-            input_str.tags = [None]*input_str.num_sites
+    #append tags to recognize the muon site.
+    input_str.tags = [None]*input_str.num_sites
 
-            for key in qeapp_node.outputs.muonic.findmuon.unique_sites.get_dict() :
-                #print("H"+key, qeapp_node.outputs.unique_sites.get_dict()[key][1], (qeapp_node.outputs.unique_sites.get_dict() [key][1]-e_min))
-                #fo.write("%s %16f %16f \n "%  ("H"+key, uniquesites_dict[key][1], (uniquesites_dict[key][1]-e_min)))
-                py_struc = Structure.from_dict(qeapp_node.outputs.muonic.findmuon.unique_sites.get_dict()[key][0])
-                musite = py_struc.frac_coords[py_struc.atomic_numbers.index(1)]
-                mupos = np.dot(musite,sc_matrix)%1
-                input_str.append(species = "H"+key, coords = mupos[0], coords_are_cartesian = False, validate_proximity = True)
-                input_str.tags.append(key)
-                
-            return input_str
-        else:
-            return None
-    else:
-        return None
+    for key in findmuon_output_node.unique_sites.get_dict() :
+        #print("H"+key, qeapp_node.outputs.unique_sites.get_dict()[key][1], (qeapp_node.outputs.unique_sites.get_dict() [key][1]-e_min))
+        #fo.write("%s %16f %16f \n "%  ("H"+key, uniquesites_dict[key][1], (uniquesites_dict[key][1]-e_min)))
+        py_struc = Structure.from_dict(findmuon_output_node.unique_sites.get_dict()[key][0])
+        musite = py_struc.frac_coords[py_struc.atomic_numbers.index(1)]
+        mupos = np.dot(musite,sc_matrix)%1
+        input_str.append(species = "H"+key, coords = mupos[0], coords_are_cartesian = False, validate_proximity = True)
+        input_str.tags.append(key)
+        
+    return input_str
+
 
 ###############start single muon site widgets #####################################      
 class SingleMuonBarPlotWidget(ipw.VBox):
@@ -470,11 +462,13 @@ class MuonSummaryTableWidget(ipw.VBox):
         for k in self.df.columns.to_list(): # may not contain magnetic info
             table_html += "<tr>"
             #table_html += "<td style='text-align:center;'>{}</td>".format(v)
-            for value in self.df[k][self.curated_reduced_html_converter.keys()].tolist():
-                if not isinstance(value,str):
-                    table_html += "<td style='text-align:center;'>{}</td>".format(np.round(float(value),3))
-                else: #the muon index is s string.
-                    table_html += "<td style='text-align:center;'>{}</td>".format(value)
+            for kk,v in self.reduced_html_converter.items():
+                if kk in self.df[k].index.tolist():
+                    value = self.df[k].loc[kk]
+                    if not isinstance(value,str):
+                        table_html += "<td style='text-align:center;'>{}</td>".format(np.round(float(value),3))
+                    else: #the muon index is s string.
+                        table_html += "<td style='text-align:center;'>{}</td>".format(value)
             table_html += "</tr>"
         table_html += "</table>"
         
@@ -554,10 +548,11 @@ class SummaryMuonStructureBarWidget(ipw.VBox):
     def _update_picked(self,change):
         #This is triggered changing the picked atom selected in the structure view.
         if len(change["new"])>0:
-            if self.tags[change["new"][-1]]:
-                self.child2.selected = str(self.tags[change["new"][-1]])
-                self.dropdown.value = self.child2.selected         
+            if change["new"][-1] <= len(self.tags): #temporary fixing for supercells generate live in structuredataviewer: the indexes increases 
+                if self.tags[change["new"][-1]]:
+                    self.child2.selected = str(self.tags[change["new"][-1]])
+                    self.dropdown.value = self.child2.selected         
         else:
-            self.child2.selected = None            
+            self.child2.selected = None           
 
 ###############end summary muon sites widgets #####################################
