@@ -43,10 +43,10 @@ def get_builder(codes, structure, parameters):
 
     scf_overrides = deepcopy(parameters["advanced"])
     overrides = {
-        "relax":{
+        #"relax":{
             "base": scf_overrides,
-        },
-        "pwscf": scf_overrides,
+        #},
+        #"pwscf": scf_overrides,
     }
     
     builder = ImplantMuonWorkChain.get_builder_from_protocol(
