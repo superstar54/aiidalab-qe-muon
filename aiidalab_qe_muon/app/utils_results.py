@@ -12,6 +12,81 @@ from aiidalab_widgets_base.viewers import StructureDataViewer
 
 from pymatgen.core import Structure
 
+
+#### for KT
+
+from ase.io import read
+from ase import neighborlist
+
+from importlib_resources import files
+from aiidalab_qe_muon.app import data
+
+file = files(data)/'isotopedata.txt'
+
+info = pd.read_table(file,comment='%', 
+                     delim_whitespace=True, 
+                     names = ["Z","A","Stable", "Symbol", 
+                              "Element", "Spin", "G_factor", 
+                              "Abundance", "Quadrupole"])
+
+munhbar = 7.622593285e6*2*np.pi # mu_N/hbar, SI
+#(2/3)(μ_0/4pi)^2 (planck2pi 2pi × 135.5 MHz/T )^2 = 5.374 021 39 × 10^(−65) kg²·m^(6)·A^(−2)·s^(−4)
+factor = 5.37402139E-5 # angstrom instead of m
+
+def get_isotopes(Z):
+    return info[info.Z==Z][['Abundance','Spin','G_factor']].to_numpy()
+
+
+
+def compute_second_moments(atms, cutoff_distances = {}):
+    """
+    Compute second moments taking care of isotope averages
+    """
+    tot_H = np.count_nonzero(atms.get_atomic_numbers() == 1)
+    
+    species_avg = {}
+    for e in np.unique(atms.get_atomic_numbers()):
+        if e == 1:
+            continue
+    
+        species_avg[e] = 0.0
+        for a in get_isotopes(e):
+            species_avg[e] += (a[0]/100) * a[1]*(a[1]+1) * (munhbar*a[2])**2
+    
+    # compute second moments
+    specie_contribs = {}
+    for e in np.unique(atms.get_atomic_numbers()):
+        if e == 1:
+            continue
+        sum = 0.5 * np.sum(neighborlist.neighbor_list('d',atms, cutoff={(1,e): cutoff_distances.get(e, 40)})**-6)
+        specie_contribs[e] = species_avg[e] * sum * factor / tot_H
+
+    return specie_contribs
+
+
+import matplotlib.pyplot as plt
+
+def kubo_toyabe(tlist, Gmu_S2):
+        """Calculates the Kubo-Toyabe polarization for the nuclear arrangement
+        provided in input.
+    
+        Parameters
+        ----------
+        tlist : numpy.array
+            List of times at which the muon polarization is observed.
+    
+        Returns
+        -------
+        numpy.array
+            Kubo-Toyabe function, for a powder in zero field.
+        """
+        # this is gamma_mu times sigma^2
+        return 0.333333333333 + 0.6666666666 * \
+                (1- Gmu_S2  *  np.power(tlist,2)) * \
+                np.exp( - 0.5 * Gmu_S2 * np.power(tlist,2))
+
+#### end for KT
+
 change_names_for_html = {
         #"tot_energy":"total energy (eV)",
         "muon_position_cc":"muon position (crystal coordinates)",
@@ -298,7 +373,70 @@ class SingleMuonStructureBarWidget(ipw.VBox):
 ###############end single muon site widgets #####################################
 
 ###############start summary muon sites widgets #####################################
+class KT_asymmetry_widget(ipw.HBox):
+    
+    def __init__(
+        self,
+        df,
+        selected=None,  
+        **kwargs):
+        
+        self.fig = go.FigureWidget()
+        self.df=df
+        self.KT = {}
+        self.t = np.linspace(0,10e-6,1000) #should be a slider
+        self.selected = selected
 
+
+        #figure widget
+        ## the scatter plots.
+        for data,label in zip(df.loc["structure"].tolist(),df.loc["muon_index"].tolist()):
+            atms = data.get_ase()
+
+            
+            sm = compute_second_moments(atms)
+            self.KT[label] = kubo_toyabe(self.t, np.sum(list(sm.values())))
+        
+    
+        for label,data in self.KT.items():
+            self.fig.add_trace(
+                        go.Scatter(
+                            name="muon site #"+label,
+                            x = self.t,
+                            y = data,
+                            mode='lines',
+                            marker=dict(
+                                 size=10), 
+                            line=dict(
+                                 width=2),
+
+                        ),
+                    )
+        #updating the layout.
+        ## we stack the bar plots, for each muon site/tick (self.muon_labels)
+        self.fig.update_layout(
+            clickmode='event+select',
+            title='Kubo-Toyabe polarization',
+            barmode='group',
+            yaxis=dict(title='P<sup>KT</sup>(T)'),
+            xaxis=dict(title='s'),
+            legend=dict(x=0.01, y=1, xanchor='left', yanchor='top'),
+            width=600, # Width of the plot
+            height=500, # Height of the plot
+
+            font=dict( # Font size and color of the labels
+                size=12,
+                color='#333333',
+            ),
+            plot_bgcolor='gainsboro', # Background color of the plot
+            #paper_bgcolor='white', # Background color of the paper
+
+            #bargap=0.000001, # Gap between bars
+            #bargroupgap=0.4, # Gap between bar groups
+        )
+        
+        super().__init__(children=[self.fig],**kwargs)
+        
 class MuonSummaryBarPlotWidget(ipw.VBox):
     """
     Widget for the summary bar plot with all unique muon sites.
@@ -369,7 +507,7 @@ class MuonSummaryBarPlotWidget(ipw.VBox):
         #updating the layout.
         ## we stack the bar plots, for each muon site/tick (self.muon_labels)
         self.fig.update_layout(
-            title='Summary',
+            #title='Summary',
             barmode='group',
             yaxis=dict(title='Field magnitude (T)'),
             yaxis2=dict(title='ΔE<sub>total</sub> (eV)',
@@ -522,12 +660,16 @@ class SummaryMuonStructureBarWidget(ipw.VBox):
             self.dropdown_label = ipw.HTML("Select muon site:")
             self.dropdown_widget = ipw.HBox(children=[self.dropdown_label,self.dropdown])
             
+            self.KT_asymmetry = KT_asymmetry_widget(df)
+            
             children = [self.dropdown_widget,
                         self.cell_label,
                         self.child1,
-                        ipw.HBox([self.child2,
-                                    self.child3,
-                                ])]
+                        ipw.HBox([self.child3,
+                                    self.child2,
+                                ]),
+                       self.KT_asymmetry
+                       ]
         else:
             children = []
             
@@ -553,6 +695,6 @@ class SummaryMuonStructureBarWidget(ipw.VBox):
                     self.child2.selected = str(self.tags[change["new"][-1]])
                     self.dropdown.value = self.child2.selected         
         else:
-            self.child2.selected = None           
+            self.child2.selected = None         
 
 ###############end summary muon sites widgets #####################################
