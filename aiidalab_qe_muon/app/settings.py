@@ -57,6 +57,24 @@ class Setting(Panel):
         )
         #end charge
         
+        #start pseudo. VERY BAD. but needed to use gbrv in muons. because of the routine get_pseudos.
+        # to change.
+        ## there should be the choice between installed pseudos... use group query maybe.
+        ### gbrv automatic install TODO.
+        self.pseudo_choice_ = ipw.Text(
+            value='',
+            disabled=False,
+        )
+        self.pseudo_choice_.observe(self._validate_pseudo_family,"value")
+        self.pseudo_label = ipw.HTML("Ad-hoc installed pseudo family:")
+        
+        self.warning_pseudo_widget = ipw.HTML(
+            f"Errors... Are you sure that the written pseudo family is installed?/has every element in the structure? We rely on the SSSP/1.2/PBEsol/efficiency"
+            )
+        self.warning_pseudo_widget.layout.display = "none"
+        
+        #end pseudo
+        
         self.workchain_protocol = ipw.ToggleButtons(
             options=["fast", "moderate", "precise"],
             value="moderate",
@@ -222,6 +240,11 @@ class Setting(Panel):
             self.mu_spacing_description,
             ipw.HBox([self.mu_spacing_, self.number_of_supercells]),
             self.moments,
+            ipw.VBox([
+                ipw.HBox([self.pseudo_label, self.pseudo_choice_]),
+                self.warning_pseudo_widget,
+                ]
+            )
         ]
         super().__init__(**kwargs)
         
@@ -231,6 +254,20 @@ class Setting(Panel):
             self._display_mesh()
             self._estimate_supercells()
             self._display_moments()
+            
+    def _validate_pseudo_family(self,change):
+        """try to load the pseudo family and raise warning/exception"""
+        if len(change["new"])> 0:
+            try: 
+                family = orm.load_group(change["new"])
+                if self.input_structure:
+                    pseudos = family.get_pseudos(structure=self.input_structure)
+                    self.warning_pseudo_widget.layout.display = "none"
+            except:
+                self.warning_pseudo_widget.layout.display = "block"
+        else:
+            self.warning_pseudo_widget.layout.display = "none"
+            
             
     def _compute_supercell(self, change):
         for elem in [self._sc_x,self._sc_y,self._sc_z]:
@@ -328,6 +365,8 @@ class Setting(Panel):
             self.spin_pol_.value = False
             self.spin_pol_.disabled = True
         pass
+    
+
          
     def SitesWidget(self,):
         """
@@ -356,6 +395,7 @@ class Setting(Panel):
                 "magmoms":self.magmoms,
                 "hubbard":self.hubbard_.value,
                 "spin_pol":self.spin_pol_.value,
+                "pseudo_choice":self.pseudo_choice_.value
                 }
 
     def load_panel_value(self, input_dict):
@@ -368,6 +408,7 @@ class Setting(Panel):
         self.magmoms = input_dict.get("magmoms",None)
         self.hubbard_.value = input_dict.get("hubbard",False)
         self.spin_pol_.value = input_dict.get("spin_pol",True)
+        self.pseudo_choice_.value = input_dict.get("pseudo_choice",True)
         
     def reset(self):
         """Reset the panel"""
@@ -379,4 +420,5 @@ class Setting(Panel):
         self.magmoms = None
         self.hubbard_.value = True
         self.spin_pol_.value = True
+        self.pseudo_choice_.value = ''
 

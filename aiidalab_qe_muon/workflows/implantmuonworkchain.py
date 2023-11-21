@@ -88,7 +88,7 @@ class ImplantMuonWorkChain(WorkChain):
         cls,
         pw_code,
         structure,
-        pseudo_family: str ="SSSP/1.2/PBE/efficiency",
+        pseudo_family: str = "SSSP/1.2/PBE/efficiency",
         pp_code=None,
         protocol=None,
         overrides: dict = {},

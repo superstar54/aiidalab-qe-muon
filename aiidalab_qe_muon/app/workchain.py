@@ -1,4 +1,4 @@
-from aiida.orm import load_code, Dict, Bool
+from aiida.orm import load_code, Dict, Bool,load_group
 from aiida.plugins import WorkflowFactory, DataFactory
 from aiida_quantumespresso.common.types import ElectronicType, SpinType
 
@@ -32,6 +32,13 @@ def get_builder(codes, structure, parameters):
     
     hubbard = parameters["muonic"].pop("hubbard",False)
     
+    pseudo_family = parameters["muonic"].pop("pseudo_choice","")
+    try: 
+        family = load_group(pseudo_family)
+        pseudos = family.get_pseudos(structure=structure)
+    except:
+        pseudo_family = "SSSP/1.2/PBEsol/efficiency"
+    
     if hubbard and old_structuredata:
         structure = HubbardStructureData.from_structure(structure)
     
@@ -52,7 +59,7 @@ def get_builder(codes, structure, parameters):
     builder = ImplantMuonWorkChain.get_builder_from_protocol(
         pw_code=pw_code,
         pp_code=pp_code,
-        pseudo_family="SSSP/1.2/PBEsol/efficiency", #hard coded...
+        pseudo_family=pseudo_family, 
         structure=structure,
         protocol=protocol,
         overrides=overrides,
