@@ -384,7 +384,7 @@ class KT_asymmetry_widget(ipw.HBox):
         self.fig = go.FigureWidget()
         self.df=df
         self.KT = {}
-        self.t = np.linspace(0,20e-6,1000) #should be a slider
+        self.t = np.linspace(0,40e-6,1000) #should be a slider
         self.selected = selected
 
 
