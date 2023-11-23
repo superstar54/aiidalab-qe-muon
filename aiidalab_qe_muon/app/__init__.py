@@ -2,7 +2,7 @@ from aiidalab_qe_muon.app.settings import Setting
 from aiidalab_qe_muon.app.structure import ImportMagnetism
 from aiidalab_qe_muon.app.workchain import workchain_and_builder
 from aiidalab_qe_muon.app.result import Result
-from aiidalab_qe_muon.app.codes import pp_code
+from aiidalab_qe_muon.app.codes import PpComputationalResourcesWidget
 
 from aiidalab_qe.common.panel import OutlinePanel
 
@@ -16,5 +16,10 @@ property ={
 "setting": Setting,
 "workchain": workchain_and_builder,
 "result": Result,
-"code": {"pp_code": pp_code},
+"code": {
+    "pp_code": PpComputationalResourcesWidget(
+        description="pp.x",
+        default_calc_job_plugin="quantumespresso.pp",
+        ),
+    },
 }

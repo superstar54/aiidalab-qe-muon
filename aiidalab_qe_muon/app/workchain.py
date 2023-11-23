@@ -14,12 +14,27 @@ except:
     
 old_structuredata=True
 
+def update_resources(builder,codes):
+
+    pp_code=codes.get("pp_code", None).get("code", None)
+    
+    if pp_code:
+        pp_metadata = {
+            "options": {
+                "max_wallclock_seconds": codes.get("pp_code")["max_wallclock_seconds"], 
+                "resources": {
+                    "num_machines": codes.get("pp_code")["nodes"],
+                    "num_mpiprocs_per_machine": codes.get("pp_code")["cpus"],
+                    },
+                },
+            }
+        builder.findmuon.pp_metadata = pp_metadata
+
 def get_builder(codes, structure, parameters):
     from copy import deepcopy
     
     protocol = parameters["workchain"].pop("protocol", "fast")
-    pw_code = codes.get("pw")
-    pp_code = codes.get("pp_code", None)
+    
     
     magmom = parameters["muonic"].pop("magmoms",None)
     supercell = parameters["muonic"].pop("supercell_selector", None)
@@ -57,8 +72,8 @@ def get_builder(codes, structure, parameters):
     }
     
     builder = ImplantMuonWorkChain.get_builder_from_protocol(
-        pw_code=pw_code,
-        pp_code=pp_code,
+        pw_code=codes.get("pw")["code"],
+        pp_code=codes.get("pp_code", None).get("code", None),
         pseudo_family=pseudo_family, 
         structure=structure,
         protocol=protocol,
@@ -76,17 +91,8 @@ def get_builder(codes, structure, parameters):
         initial_magnetic_moments=parameters["advanced"]["initial_magnetic_moments"],
         )
     
-    pp_metadata = {
-    "options": {
-        "max_wallclock_seconds": 60*60, 
-        "resources": {
-            "num_machines": 1,
-            "num_mpiprocs_per_machine":1,
-            },
-        },
-    }
-    if pp_code:
-        builder.findmuon.pp_metadata = pp_metadata
+    update_resources(builder,codes)
+    
         
     return builder
 
