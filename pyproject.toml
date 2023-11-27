@@ -19,7 +19,9 @@ classifiers = [
 ]
 keywords = ["aiidalab", "muon"]
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "aiida-muon @ git+https://github.com/positivemuon/aiida-muon@dev_StructureData"	
+]
 
 [project.urls]
 Source = "https://github.com/positivemuon/aiida-muon"
