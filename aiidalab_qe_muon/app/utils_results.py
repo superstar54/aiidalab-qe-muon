@@ -420,7 +420,7 @@ class KT_asymmetry_widget(ipw.HBox):
             title='Kubo-Toyabe polarization',
             barmode='group',
             yaxis=dict(title='P<sup>KT</sup>(T)'),
-            xaxis=dict(title='time($\mu$s)'),
+            xaxis=dict(title='time(μs)'),
             legend=dict(x=0.01, y=1, xanchor='left', yanchor='top'),
             width=600, # Width of the plot
             height=500, # Height of the plot
