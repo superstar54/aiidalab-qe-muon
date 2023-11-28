@@ -22,6 +22,7 @@ requires-python = ">=3.8"
 dependencies = [
    "aiida-muon @ git+https://github.com/positivemuon/aiida-muon@dev_StructureData", 
    "pymatgen>=2023.9.25",
+   "aiidalab-widget-base=2.1.0a0",
 ]
 
 [project.urls]
