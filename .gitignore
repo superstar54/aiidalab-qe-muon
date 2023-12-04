@@ -2,3 +2,5 @@
 /aiidalab_qe_muon/app/__pycache__/*
 /aiidalab_qe_muon/workflows/__pycache__/*
 /aiidalab_qe_muon/app/data/__pycache__/*
+dist
+build

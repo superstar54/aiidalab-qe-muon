@@ -24,11 +24,11 @@ from aiidalab_widgets_base import (
 )
 from pymatgen.core import Structure
 
-def get_pymatgen_from_file(fname, file_format="mcif"):  # pylint: disable=redefined-builtin
+def get_pymatgen_from_file(fname, file_format="mcif",primitive=True):  # pylint: disable=redefined-builtin
     """Get pymatgen structure object."""
     try:
         parser  = CifParser(fname)
-        traj    = parser.get_structures(primitive = True)[0]
+        traj    = parser.get_structures(primitive = primitive)[0]
     except:
         raise ValueError(f"Could not read any information from the file {fname}")
     return traj
@@ -49,9 +49,15 @@ class ImportMagnetism(StructureUploadWidget):
     ):
         super().__init__()
         self.title = title
+        self.file_upload_subwidget1 = ipw.Checkbox(
+            description="Use conventional (select before the upload)",
+            indent=False,
+            value=False,
+        )
         self.file_upload = ipw.FileUpload(
             description=description, multiple=False, layout={"width": "initial"}
         )
+        
         # Whether to allow uploading multiple structures from a single file.
         # In this case, we create TrajectoryData node.
         supported_formats = ipw.HTML(
@@ -59,6 +65,8 @@ class ImportMagnetism(StructureUploadWidget):
         )
         self._status_message = StatusHTML(clear_after=5)
         self.file_upload.observe(self._on_file_upload, names="value")
+        
+        self.children = tuple([self.file_upload_subwidget1]) + self.children
         
     def _validate_and_fix_pymatgen_cell(self, structure):
     
@@ -77,7 +85,7 @@ class ImportMagnetism(StructureUploadWidget):
             temp_file.write(content)
             temp_file.flush()
             try:
-                structures = get_pymatgen_from_file(temp_file.name)
+                structures = get_pymatgen_from_file(temp_file.name,primitive=not self.file_upload_subwidget1)
             except KeyError:
                 self._status_message.message = f"""
                     <div class="alert alert-danger">ERROR: Could not parse file {fname}</div>

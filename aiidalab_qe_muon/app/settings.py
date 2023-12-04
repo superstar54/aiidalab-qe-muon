@@ -41,8 +41,7 @@ class Setting(Panel):
         self.charge_help = ipw.HTML(
             """<div style="line-height: 140%; padding-top: 5px; padding-bottom: 5px">
             <h5><b>Muon charge state</b></h5>
-            If you select a neutral muon, this will resemble the "muonium" state. Usually, 
-            this may happen in insulators. It represents the analogous of the hydrogen 
+            If you select a neutral muon, this will resemble the "muonium" state. It represents the analogous of the hydrogen 
             atom (it can be thought as one of its lightest isotopes), which is the
             most simplest defects in a semiconductor. The electronic structure of H 
             and muonium are then expected to be identical;
@@ -239,12 +238,13 @@ class Setting(Panel):
             ipw.HBox([self.kpoints_distance_, self.mesh_grid]),
             self.mu_spacing_description,
             ipw.HBox([self.mu_spacing_, self.number_of_supercells]),
-            self.moments,
             ipw.VBox([
                 ipw.HBox([self.pseudo_label, self.pseudo_choice_]),
                 self.warning_pseudo_widget,
                 ]
-            )
+            ),
+            self.moments,
+            
         ]
         super().__init__(**kwargs)
         

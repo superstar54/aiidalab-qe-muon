@@ -384,7 +384,8 @@ class KT_asymmetry_widget(ipw.HBox):
         self.fig = go.FigureWidget()
         self.df=df
         self.KT = {}
-        self.t = np.linspace(0,10e-6,1000) #should be a slider
+        self.t = np.linspace(0,40e-6,1000) #should be a slider
+        self.t_axes = np.linspace(0,40,1000) #should be a slider
         self.selected = selected
 
 
@@ -402,7 +403,7 @@ class KT_asymmetry_widget(ipw.HBox):
             self.fig.add_trace(
                         go.Scatter(
                             name="muon site #"+label,
-                            x = self.t,
+                            x = self.t_axes,
                             y = data,
                             mode='lines',
                             marker=dict(
@@ -419,7 +420,7 @@ class KT_asymmetry_widget(ipw.HBox):
             title='Kubo-Toyabe polarization',
             barmode='group',
             yaxis=dict(title='P<sup>KT</sup>(T)'),
-            xaxis=dict(title='s'),
+            xaxis=dict(title='time (μs)'),
             legend=dict(x=0.01, y=1, xanchor='left', yanchor='top'),
             width=600, # Width of the plot
             height=500, # Height of the plot
