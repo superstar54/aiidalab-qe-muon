@@ -40,7 +40,7 @@ def InstallCodes(code_name="pp", computer_name="localhost"):
             capture_output=True,
         )
     else:
-        raise ValueError(f"Code {code_name}-{QE_VERSION}@{computer_name} already set up")
+        raise Warning(f"Code {code_name}-{QE_VERSION}@{computer_name} already set up")
 
 if __name__ == "__main__":
     InstallCodes(code_name="pp")
