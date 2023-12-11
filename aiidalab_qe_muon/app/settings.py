@@ -395,7 +395,7 @@ class Setting(Panel):
                 "magmoms":self.magmoms,
                 "hubbard":self.hubbard_.value,
                 "spin_pol":self.spin_pol_.value,
-                "pseudo_choice":self.pseudo_choice_.value
+                "pseudo_choice":self.pseudo_choice_.value,
                 }
 
     def load_panel_value(self, input_dict):

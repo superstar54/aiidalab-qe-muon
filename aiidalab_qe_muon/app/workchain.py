@@ -29,7 +29,14 @@ def update_resources(builder,codes):
                 },
             }
         builder.findmuon.pp_metadata = pp_metadata
-
+        
+    pw_wallclock = codes.get("muon_pw_code", None).get("max_wallclock_seconds", None)
+    if pw_wallclock:
+        builder.findmuon.relax.base.pw.metadata["options"]["max_wallclock_seconds"] = pw_wallclock
+        if "pwscf" in builder:
+            builder.pwscf.pw.metadata["options"]["max_wallclock_seconds"] = pw_wallclock
+    
+    
 def get_builder(codes, structure, parameters):
     from copy import deepcopy
     
@@ -70,9 +77,11 @@ def get_builder(codes, structure, parameters):
         #},
         #"pwscf": scf_overrides,
     }
+     
     
     builder = ImplantMuonWorkChain.get_builder_from_protocol(
-        pw_code=codes.get("pw")["code"],
+        #pw_code=codes.get("pw")["code"],
+        pw_code=codes.get("muon_pw_code", None).get("code", None),
         pp_code=codes.get("pp_code", None).get("code", None),
         pseudo_family=pseudo_family, 
         structure=structure,

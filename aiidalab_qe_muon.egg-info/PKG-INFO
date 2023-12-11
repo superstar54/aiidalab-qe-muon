@@ -40,6 +40,12 @@ Then, install this plugin by:
 pip install -e .
 ```
 
+To also install the needed codes, if not already there, you can then run:
+
+```shell
+install_muon_codes
+```
+
 ## License
 
 MIT
