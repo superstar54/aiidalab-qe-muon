@@ -14,7 +14,7 @@ from aiida_quantumespresso.calculations.functions.create_kpoints_from_distance i
     create_kpoints_from_distance,
 )
 from aiidalab_qe.common.panel import Panel
-
+from ase.build import make_supercell
 from aiida_muon.workflows.find_muon import gensup, niche_add_impurities
 
 
@@ -24,6 +24,13 @@ class Setting(Panel):
     input_structure = tl.Instance(orm.StructureData, allow_none=True)
     
     def __init__(self, **kwargs):
+        
+        self.Warning_button = ipw.HTML(
+            """<div style="padding-top: 0px; padding-bottom: 0px; color: #ff6347">
+            <h1>Muon spectroscopy does not yet support low-dimensional systems: please note that the simulation will except.</h1></div>""",
+        )
+        self.Warning_button.layout.display = "none"
+    
         self.settings_title = ipw.HTML(
             """<div style="padding-top: 0px; padding-bottom: 0px">
             <h4>Muon spectroscopy settings</h4></div>"""
@@ -219,6 +226,7 @@ class Setting(Panel):
         #end
         
         self.children = [
+            self.Warning_button,
             self.settings_title,
             self.settings_help,
             self.supercell_known_widget,
@@ -280,9 +288,15 @@ class Setting(Panel):
         if self.input_structure is None:
             return
         if self.kpoints_distance_.value > 0:
-            supercell_ = self.input_structure.get_pymatgen()
-            supercell_ = supercell_.make_supercell(self.supercell)
-            supercell = orm.StructureData(pymatgen=supercell_)
+            # make supercell now supports only diagonal transformation matrices.
+            supercell_ = self.input_structure.get_ase()
+            supercell_ = make_supercell(
+                supercell_,
+                [[self.supercell[0],0,0],
+                [0,self.supercell[1],0],
+                [0,0,self.supercell[2]]]
+                )
+            supercell = orm.StructureData(ase=supercell_)
             mesh = create_kpoints_from_distance(
                 supercell,
                 orm.Float(self.kpoints_distance_.value),
@@ -298,8 +312,8 @@ class Setting(Panel):
         Around 8 for metal is fine, for semiconductors it has to be verified.
         """
         if self.input_structure:
-            s = self.input_structure.get_pymatgen()
-            suggested = 9//np.array(s.lattice.abc) + 1
+            s = self.input_structure.get_ase()
+            suggested = 9//np.array(s.cell.cellpar()[:3]) + 1
             self._sc_x.value = suggested[0]
             self._sc_y.value = suggested[1]
             self._sc_z.value = suggested[2]
@@ -309,11 +323,16 @@ class Setting(Panel):
     def _write_html_supercell(self, _=None):
         #write html for supercell data:
         if self.input_structure:
-            s = self.input_structure.get_pymatgen()
-            s = s.make_supercell(self.supercell)
+            s = self.input_structure.getase()
+            s = make_supercell(
+                s,
+                [[self.supercell[0],0,0],
+                [0,self.supercell[1],0],
+                [0,0,self.supercell[2]]]
+                )
             sc_html="Supercell lattice parameters, angles and volume: "
-            abc = np.round(s.lattice.abc,3)
-            alfa_beta_gamma = np.round(s.lattice.angles,1)
+            abc = np.round(s.cell.cellpar()[:3],3)
+            alfa_beta_gamma = np.round(s.cell.cellpar()[3:],1)
             sc_html += f"a="+str(abc[0])+"Å, "
             sc_html += f"b="+str(abc[1])+"Å, "
             sc_html += f"c="+str(abc[2])+"Å; "
@@ -335,13 +354,16 @@ class Setting(Panel):
         if self.input_structure is None:
             return
         else:
-            mu_lst = niche_add_impurities(
+            if False in self.input_structure.pbc:
+                self.Warning_button.layout.display = "block"
+            else:
+                mu_lst = niche_add_impurities(
                 self.input_structure, orm.Str("H"), orm.Float(self.mu_spacing_.value), orm.Float(1.0)
-            )
+                )
             
-            sc_matrix = [[self.supercell[0],0,0],[0,self.supercell[1],0],[0,0,self.supercell[2]]]
-            supercell_list = gensup(self.input_structure.get_pymatgen(), mu_lst, sc_matrix)  # ordinary function           
-            self.number_of_supercells.value = "Number of supercells: "+str(len(supercell_list))
+                sc_matrix = [[self.supercell[0],0,0],[0,self.supercell[1],0],[0,0,self.supercell[2]]]
+                supercell_list = gensup(self.input_structure.get_pymatgen(), mu_lst, sc_matrix)  # ordinary function           
+                self.number_of_supercells.value = "Number of supercells: "+str(len(supercell_list))
     
     def _display_moments(self, _=None):
         """
