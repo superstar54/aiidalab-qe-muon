@@ -365,7 +365,7 @@ class Setting(Panel):
             sc_html += f"β=" + str(alfa_beta_gamma[1]) + "Å, "
             sc_html += f"γ=" + str(alfa_beta_gamma[2]) + "Å; "
 
-            sc_html += f"V={round(s.lattice.volume,3)}Å<sup>3</sup>"
+            sc_html += f"V={round(s.get_volume(),3)}Å<sup>3</sup>"
 
             self.supercell_html.value = sc_html
 
