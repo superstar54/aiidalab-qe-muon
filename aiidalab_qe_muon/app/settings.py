@@ -20,17 +20,17 @@ from aiida_muon.workflows.find_muon import gensup, niche_add_impurities
 
 class Setting(Panel):
     title = "Muon Settings"
-    
+
     input_structure = tl.Instance(orm.StructureData, allow_none=True)
-    
+
     def __init__(self, **kwargs):
-        
+
         self.Warning_button = ipw.HTML(
             """<div style="padding-top: 0px; padding-bottom: 0px; color: #ff6347">
             <h1>Muon spectroscopy does not yet support low-dimensional systems: please note that the simulation will except.</h1></div>""",
         )
         self.Warning_button.layout.display = "none"
-    
+
         self.settings_title = ipw.HTML(
             """<div style="padding-top: 0px; padding-bottom: 0px">
             <h4>Muon spectroscopy settings</h4></div>"""
@@ -38,56 +38,57 @@ class Setting(Panel):
         self.settings_help = ipw.HTML(
             """<div style="line-height: 140%; padding-top: 0px; padding-bottom: 5px">
             Please select desired inputs to compute muon stopping sites and related properties. The muon is considered infinite-dilute
-            in the crystal, so we should select a supercell in which the muon will stay and do not interact with its replica. 
-            If you do not provide a size for the supercell size and select "Compute supercell", a pre-processing step will be submitted 
+            in the crystal, so we should select a supercell in which the muon will stay and do not interact with its replica.
+            If you do not provide a size for the supercell size and select "Compute supercell", a pre-processing step will be submitted
             to estimate it.
             </div>"""
         )
-        
-        #start charge 
+
+        # start charge
         self.charge_help = ipw.HTML(
             """<div style="line-height: 140%; padding-top: 5px; padding-bottom: 5px">
             <h5><b>Muon charge state</b></h5>
-            If you select a neutral muon, this will resemble the "muonium" state. It represents the analogous of the hydrogen 
+            If you select a neutral muon, this will resemble the "muonium" state. It represents the analogous of the hydrogen
             atom (it can be thought as one of its lightest isotopes), which is the
-            most simplest defects in a semiconductor. The electronic structure of H 
+            most simplest defects in a semiconductor. The electronic structure of H
             and muonium are then expected to be identical;
             at variance, vibrational properties are not, as the involved masses are different.
             </div>"""
         )
-        
+
         self.charged_muon_ = ipw.ToggleButtons(
             options=[("Muon (+1)", True), ("Muonium (neutral)", False)],
             value=True,
             style={"description_width": "initial"},
         )
-        #end charge
-        
-        #start pseudo. VERY BAD. but needed to use gbrv in muons. because of the routine get_pseudos.
+        # end charge
+
+        # start pseudo. VERY BAD. but needed to use gbrv in muons. because of the routine get_pseudos.
         # to change.
         ## there should be the choice between installed pseudos... use group query maybe.
         ### gbrv automatic install TODO.
         self.pseudo_choice_ = ipw.Text(
-            value='',
+            value="",
             disabled=False,
         )
-        self.pseudo_choice_.observe(self._validate_pseudo_family,"value")
+        self.pseudo_choice_.observe(self._validate_pseudo_family, "value")
         self.pseudo_label = ipw.HTML("Ad-hoc installed pseudo family:")
-        
+
         self.warning_pseudo_widget = ipw.HTML(
             f"Errors... Are you sure that the written pseudo family is installed?/has every element in the structure? We rely on the SSSP/1.2/PBEsol/efficiency"
-            )
+        )
         self.warning_pseudo_widget.layout.display = "none"
-        
-        #end pseudo
-        
+
+        # end pseudo
+
         self.workchain_protocol = ipw.ToggleButtons(
             options=["fast", "moderate", "precise"],
             value="moderate",
         )
-        
-        #start Supercell
-        self.supercell=[1,1,1]
+
+        # start Supercell
+        self.supercell = [1, 1, 1]
+
         def change_supercell(_=None):
             self.supercell = [
                 self._sc_x.value,
@@ -96,59 +97,78 @@ class Setting(Panel):
             ]
             self._display_mesh()
             self._write_html_supercell()
-             
-        for elem in ["x","y","z"]:
-            setattr(self,"_sc_"+elem,ipw.BoundedIntText(value=1, min=1, layout={"width": "40px"},disabled=True))
-        
-        for elem in [self._sc_x,self._sc_y,self._sc_z]:
+
+        for elem in ["x", "y", "z"]:
+            setattr(
+                self,
+                "_sc_" + elem,
+                ipw.BoundedIntText(
+                    value=1, min=1, layout={"width": "40px"}, disabled=True
+                ),
+            )
+
+        for elem in [self._sc_x, self._sc_y, self._sc_z]:
             elem.observe(change_supercell, names="value")
-            
+
         self.supercell_selector = ipw.HBox(
-            children=[ipw.HTML(description="Supercell size:",style={"description_width": "initial"})] + [
-                self._sc_x,self._sc_y,self._sc_z,], 
+            children=[
+                ipw.HTML(
+                    description="Supercell size:",
+                    style={"description_width": "initial"},
+                )
+            ]
+            + [
+                self._sc_x,
+                self._sc_y,
+                self._sc_z,
+            ],
         )
 
         # SCell widget
         self.supercell_label = ipw.Label(
-            "Compute supercell: ", 
+            "Compute supercell: ",
             layout=ipw.Layout(justify_content="flex-start"),
-            )
+        )
         self.compute_supercell_ = ipw.Checkbox(
             description="",
             indent=False,
             value=True,
         )
-        #enable supercell setting
-        self.compute_supercell_.observe(self._compute_supercell,"value")
-            
-        #supercell data
+        # enable supercell setting
+        self.compute_supercell_.observe(self._compute_supercell, "value")
+
+        # supercell data
         self.supercell_hint_button = ipw.Button(
             description="Size hint",
             disabled=True,
-            width='500px',
+            width="500px",
         )
-        #supercell hint (9A lattice params)
+        # supercell hint (9A lattice params)
         self.supercell_hint_button.on_click(self._suggest_supercell)
-        
+
         self.supercell_html = ipw.HTML(display="none")
-                
-        self.supercell_known_widget = ipw.VBox([
-            ipw.HBox([
-                self.supercell_label, 
-                self.compute_supercell_,
-                self.supercell_hint_button,
-                self.supercell_selector,],
-                layout=ipw.Layout(justify_content="flex-start"),),
-            self.supercell_html,
-            ],    
+
+        self.supercell_known_widget = ipw.VBox(
+            [
+                ipw.HBox(
+                    [
+                        self.supercell_label,
+                        self.compute_supercell_,
+                        self.supercell_hint_button,
+                        self.supercell_selector,
+                    ],
+                    layout=ipw.Layout(justify_content="flex-start"),
+                ),
+                self.supercell_html,
+            ],
         )
-        #end Supercell.
-        
-        #start enable Hubbard. Temporary, with the LegacyStructureData.
+        # end Supercell.
+
+        # start enable Hubbard. Temporary, with the LegacyStructureData.
         self.hubbard__label = ipw.Label(
-            "Enable Hubbard correction: ", 
+            "Enable Hubbard correction: ",
             layout=ipw.Layout(justify_content="flex-start"),
-            )
+        )
         self.hubbard_ = ipw.Checkbox(
             description="",
             indent=False,
@@ -158,13 +178,13 @@ class Setting(Panel):
             [self.hubbard__label, self.hubbard_],
             layout=ipw.Layout(justify_content="flex-start"),
         )
-        #end enable Hubbard.
-        
-        #start enable spin_polarised DFT calcs.
+        # end enable Hubbard.
+
+        # start enable spin_polarised DFT calcs.
         self.spin_pol_label = ipw.Label(
-            "Enable spin polarised DFT: ", 
+            "Enable spin polarised DFT: ",
             layout=ipw.Layout(justify_content="flex-start"),
-            )
+        )
         self.spin_pol_ = ipw.Checkbox(
             description="",
             indent=False,
@@ -172,14 +192,15 @@ class Setting(Panel):
             layout=ipw.Layout(justify_content="flex-start"),
         )
         self.spin_pol_description = ipw.Label(
-            """In case of magnetic system, it computes also the contact hyperfine field.""")
-        self.spin_pol_widget = ipw.HBox(
-            [self.spin_pol_label, self.spin_pol_,self.spin_pol_description],
-            #layout=ipw.Layout(justify_content="flex-start"),
+            """In case of magnetic system, it computes also the contact hyperfine field."""
         )
-        #end enable spin_polarised DFT calcs.
-        
-        #start kpoints distance: the code is the same as the advanced settings.
+        self.spin_pol_widget = ipw.HBox(
+            [self.spin_pol_label, self.spin_pol_, self.spin_pol_description],
+            # layout=ipw.Layout(justify_content="flex-start"),
+        )
+        # end enable spin_polarised DFT calcs.
+
+        # start kpoints distance: the code is the same as the advanced settings.
         self.kpoints_description = ipw.HTML(
             """<div style="line-height: 140%; padding-top: 5px; padding-bottom: 5px">
             <h5><b>K-points mesh density</b></h5>
@@ -187,7 +208,7 @@ class Setting(Panel):
             The value below represents the maximum distance between the k-points in each direction of
             reciprocal space.</div>"""
         )
-        
+
         self.kpoints_distance_ = ipw.BoundedFloatText(
             min=0.0,
             step=0.05,
@@ -198,16 +219,16 @@ class Setting(Panel):
         )
         self.kpoints_distance_.observe(self._display_mesh, "value")
         self.mesh_grid = ipw.HTML()
-        #end kpoints distance.
-        
-        #start mu spacing. We should provide also some estimation on the # of the supercell generated.
-        #in conjunction with the supercell size. 
+        # end kpoints distance.
+
+        # start mu spacing. We should provide also some estimation on the # of the supercell generated.
+        # in conjunction with the supercell size.
         self.mu_spacing_description = ipw.HTML(
             """<div style="line-height: 140%; padding-top: 5px; padding-bottom: 5px">
             <h5><b>Muons site distance</b></h5>
             Muons distance in Å for different candidate positions in the choosen supercell.</div>"""
         )
-        
+
         self.mu_spacing_ = ipw.BoundedFloatText(
             min=0.05,
             step=0.05,
@@ -218,13 +239,13 @@ class Setting(Panel):
         )
         self.mu_spacing_.observe(self._estimate_supercells, "value")
         self.number_of_supercells = ipw.HTML()
-        #end mu spacing.
-        
-        #start TEMPORARY magnetic moments settings. this should be in the structure creation.
-        #self.sites_widget = SitesWidgets(self)
+        # end mu spacing.
+
+        # start TEMPORARY magnetic moments settings. this should be in the structure creation.
+        # self.sites_widget = SitesWidgets(self)
         self.moments = ipw.HTML()
-        #end
-        
+        # end
+
         self.children = [
             self.Warning_button,
             self.settings_title,
@@ -246,27 +267,27 @@ class Setting(Panel):
             ipw.HBox([self.kpoints_distance_, self.mesh_grid]),
             self.mu_spacing_description,
             ipw.HBox([self.mu_spacing_, self.number_of_supercells]),
-            ipw.VBox([
-                ipw.HBox([self.pseudo_label, self.pseudo_choice_]),
-                self.warning_pseudo_widget,
+            ipw.VBox(
+                [
+                    ipw.HBox([self.pseudo_label, self.pseudo_choice_]),
+                    self.warning_pseudo_widget,
                 ]
             ),
             self.moments,
-            
         ]
         super().__init__(**kwargs)
-        
+
     @tl.observe("input_structure")
     def _update_input_structure(self, change):
         if self.input_structure is not None:
             self._display_mesh()
             self._estimate_supercells()
             self._display_moments()
-            
-    def _validate_pseudo_family(self,change):
+
+    def _validate_pseudo_family(self, change):
         """try to load the pseudo family and raise warning/exception"""
-        if len(change["new"])> 0:
-            try: 
+        if len(change["new"]) > 0:
+            try:
                 family = orm.load_group(change["new"])
                 if self.input_structure:
                     pseudos = family.get_pseudos(structure=self.input_structure)
@@ -275,15 +296,14 @@ class Setting(Panel):
                 self.warning_pseudo_widget.layout.display = "block"
         else:
             self.warning_pseudo_widget.layout.display = "none"
-            
-            
+
     def _compute_supercell(self, change):
-        for elem in [self._sc_x,self._sc_y,self._sc_z]:
+        for elem in [self._sc_x, self._sc_y, self._sc_z]:
             elem.disabled = change["new"]
         self.supercell_hint_button.disabled = change["new"]
         self._write_html_supercell()
-        self.supercell_html.layout.display = 'none' if change["new"] else "block"
-            
+        self.supercell_html.layout.display = "none" if change["new"] else "block"
+
     def _display_mesh(self, _=None):
         if self.input_structure is None:
             return
@@ -292,10 +312,12 @@ class Setting(Panel):
             supercell_ = self.input_structure.get_ase()
             supercell_ = make_supercell(
                 supercell_,
-                [[self.supercell[0],0,0],
-                [0,self.supercell[1],0],
-                [0,0,self.supercell[2]]]
-                )
+                [
+                    [self.supercell[0], 0, 0],
+                    [0, self.supercell[1], 0],
+                    [0, 0, self.supercell[2]],
+                ],
+            )
             supercell = orm.StructureData(ase=supercell_)
             mesh = create_kpoints_from_distance(
                 supercell,
@@ -305,47 +327,48 @@ class Setting(Panel):
             self.mesh_grid.value = "Mesh " + str(mesh.get_kpoints_mesh()[0])
         else:
             self.mesh_grid.value = "Please select a number higher than 0.0"
-    
+
     def _suggest_supercell(self, _=None):
         """
-        minimal supercell size for muons, imposing a min_dist (lattice parameter) of 9 A. 
+        minimal supercell size for muons, imposing a min_dist (lattice parameter) of 9 A.
         Around 8 for metal is fine, for semiconductors it has to be verified.
         """
         if self.input_structure:
             s = self.input_structure.get_ase()
-            suggested = 9//np.array(s.cell.cellpar()[:3]) + 1
+            suggested = 9 // np.array(s.cell.cellpar()[:3]) + 1
             self._sc_x.value = suggested[0]
             self._sc_y.value = suggested[1]
             self._sc_z.value = suggested[2]
         else:
-            return 
-        
+            return
+
     def _write_html_supercell(self, _=None):
-        #write html for supercell data:
+        # write html for supercell data:
         if self.input_structure:
-            s = self.input_structure.getase()
+            s = self.input_structure.get_ase()
             s = make_supercell(
                 s,
-                [[self.supercell[0],0,0],
-                [0,self.supercell[1],0],
-                [0,0,self.supercell[2]]]
-                )
-            sc_html="Supercell lattice parameters, angles and volume: "
-            abc = np.round(s.cell.cellpar()[:3],3)
-            alfa_beta_gamma = np.round(s.cell.cellpar()[3:],1)
-            sc_html += f"a="+str(abc[0])+"Å, "
-            sc_html += f"b="+str(abc[1])+"Å, "
-            sc_html += f"c="+str(abc[2])+"Å; "
-            
-            sc_html += f"α="+str(alfa_beta_gamma[0])+"Å, "
-            sc_html += f"β="+str(alfa_beta_gamma[1])+"Å, "
-            sc_html += f"γ="+str(alfa_beta_gamma[2])+"Å; "
-            
+                [
+                    [self.supercell[0], 0, 0],
+                    [0, self.supercell[1], 0],
+                    [0, 0, self.supercell[2]],
+                ],
+            )
+            sc_html = "Supercell lattice parameters, angles and volume: "
+            abc = np.round(s.cell.cellpar()[:3], 3)
+            alfa_beta_gamma = np.round(s.cell.cellpar()[3:], 1)
+            sc_html += f"a=" + str(abc[0]) + "Å, "
+            sc_html += f"b=" + str(abc[1]) + "Å, "
+            sc_html += f"c=" + str(abc[2]) + "Å; "
+
+            sc_html += f"α=" + str(alfa_beta_gamma[0]) + "Å, "
+            sc_html += f"β=" + str(alfa_beta_gamma[1]) + "Å, "
+            sc_html += f"γ=" + str(alfa_beta_gamma[2]) + "Å; "
+
             sc_html += f"V={round(s.lattice.volume,3)}Å<sup>3</sup>"
-            
+
             self.supercell_html.value = sc_html
-        
-              
+
     def _estimate_supercells(self, _=None):
         """estimate the number of supercells, given sc_matrix and mu_spacing.
         this is copied from the FindMuonWorkChain, it is code duplication.
@@ -358,41 +381,56 @@ class Setting(Panel):
                 self.Warning_button.layout.display = "block"
             else:
                 mu_lst = niche_add_impurities(
-                self.input_structure, orm.Str("H"), orm.Float(self.mu_spacing_.value), orm.Float(1.0)
+                    self.input_structure,
+                    orm.Str("H"),
+                    orm.Float(self.mu_spacing_.value),
+                    orm.Float(1.0),
                 )
-            
-                sc_matrix = [[self.supercell[0],0,0],[0,self.supercell[1],0],[0,0,self.supercell[2]]]
-                supercell_list = gensup(self.input_structure.get_pymatgen(), mu_lst, sc_matrix)  # ordinary function           
-                self.number_of_supercells.value = "Number of supercells: "+str(len(supercell_list))
-    
+
+                sc_matrix = [
+                    [self.supercell[0], 0, 0],
+                    [0, self.supercell[1], 0],
+                    [0, 0, self.supercell[2]],
+                ]
+                supercell_list = gensup(
+                    self.input_structure.get_pymatgen(), mu_lst, sc_matrix
+                )  # ordinary function
+                self.number_of_supercells.value = "Number of supercells: " + str(
+                    len(supercell_list)
+                )
+
     def _display_moments(self, _=None):
         """
         Display the magnetic moments and set the magmoms inputs for the simulation.
         """
         if self.input_structure is None:
-            self.moments=ipw.HTML()
+            self.moments = ipw.HTML()
             self.magmoms = None
-        elif self.input_structure and "magmom" in self.input_structure.base.extras.keys():
+        elif (
+            self.input_structure and "magmom" in self.input_structure.base.extras.keys()
+        ):
             text = ""
             magmoms = self.input_structure.base.extras.get("magmom")
             text += "<h5><b>Magnetic moments in the unit cell</b></h5>"
-            for site,magmom in zip(self.input_structure.sites,magmoms):
-                text+=f'<p>{site.kind_name}, in {str(site.position)}: {str(magmom)}</p>'
+            for site, magmom in zip(self.input_structure.sites, magmoms):
+                text += (
+                    f"<p>{site.kind_name}, in {str(site.position)}: {str(magmom)}</p>"
+                )
             self.moments.value = text
             self.magmoms = magmoms
         else:
             self.magmoms = None
-        
+
         if not self.magmoms:
             self.spin_pol_.value = False
             self.spin_pol_.disabled = True
         pass
-    
 
-         
-    def SitesWidget(self,):
+    def SitesWidget(
+        self,
+    ):
         """
-        Widget to display sites and relative magnetic moment. 
+        Widget to display sites and relative magnetic moment.
         For now, magmoms can be modified by the user.
         """
         if self.input_structure is None:
@@ -400,47 +438,44 @@ class Setting(Panel):
         else:
             for site in self.input_structure.sites:
                 pass
-            
+
         return
-        
-        
-        
+
     def get_panel_value(self):
         """Return a dictionary with the input parameters for the plugin."""
 
         return {
-                "supercell_selector": self.supercell,
-                "charged_muon": self.charged_muon_.value,
-                "kpoints_distance": self.kpoints_distance_.value,
-                "mu_spacing": self.mu_spacing_.value,
-                "compute_supercell":self.compute_supercell_.value,
-                "magmoms":self.magmoms,
-                "hubbard":self.hubbard_.value,
-                "spin_pol":self.spin_pol_.value,
-                "pseudo_choice":self.pseudo_choice_.value
-                }
+            "supercell_selector": self.supercell,
+            "charged_muon": self.charged_muon_.value,
+            "kpoints_distance": self.kpoints_distance_.value,
+            "mu_spacing": self.mu_spacing_.value,
+            "compute_supercell": self.compute_supercell_.value,
+            "magmoms": self.magmoms,
+            "hubbard": self.hubbard_.value,
+            "spin_pol": self.spin_pol_.value,
+            "pseudo_choice": self.pseudo_choice_.value,
+        }
 
     def load_panel_value(self, input_dict):
         """Load a dictionary with the input parameters for the plugin."""
         self.charged_muon_.value = input_dict.get("charged_muon", True)
-        self.compute_supercell_.value = input_dict.get("compute_supercell",False)
-        self.supercell = input_dict.get("supercell_selector", [1,1,1])
+        self.compute_supercell_.value = input_dict.get("compute_supercell", False)
+        self.supercell = input_dict.get("supercell_selector", [1, 1, 1])
         self.kpoints_distance_.value = input_dict.get("kpoints_distance", 0.3)
         self.mu_spacing_.value = input_dict.get("mu_spacing", 1)
-        self.magmoms = input_dict.get("magmoms",None)
-        self.hubbard_.value = input_dict.get("hubbard",False)
-        self.spin_pol_.value = input_dict.get("spin_pol",True)
-        self.pseudo_choice_.value = input_dict.get("pseudo_choice",True)
-        
+        self.magmoms = input_dict.get("magmoms", None)
+        self.hubbard_.value = input_dict.get("hubbard", False)
+        self.spin_pol_.value = input_dict.get("spin_pol", True)
+        self.pseudo_choice_.value = input_dict.get("pseudo_choice", True)
+
     def reset(self):
         """Reset the panel"""
         self.charged_muon_.value = True
         self.compute_supercell_.value = True
-        self.supercell = [1,1,1]
+        self.supercell = [1, 1, 1]
         self.kpoints_distance_.value = 0.3
         self.mu_spacing_.value = 1
         self.magmoms = None
         self.hubbard_.value = True
         self.spin_pol_.value = True
-        self.pseudo_choice_.value = ''
-
+        self.pseudo_choice_.value = ""
